@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.33.4
+
+- Fix HAOS image builds failing with `cannot replace to directory .../app/node_modules
+  with file`: remove a tracked development-machine `node_modules` symlink and
+  exclude local dependencies from the Docker build context. The image keeps the
+  dependencies installed by `npm install` for its own target architecture.
+
 ## 1.33.3
 
 - **A cat labelled from the backlog was invisible to matching until the next

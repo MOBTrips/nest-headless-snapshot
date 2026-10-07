@@ -1,0 +1,2 @@
+# Dependencies must be installed inside the image for its target architecture.
+**/node_modules
