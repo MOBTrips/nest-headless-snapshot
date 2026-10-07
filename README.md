@@ -37,7 +37,7 @@ audio locally:
 - **Watch mode**: persistent streams, motion in named zones, an archive with a
   timeline, and a stream of Home Assistant events the rest of your automation
   can react to.
-- **Perception primitives**, all local ONNX / sherpa / MLX models:
+- **Perception primitives (opt-in)**, all local ONNX / sherpa / MLX models:
   - cat-on-surface zones (a house-trained detector plus COCO veto) →
     `nest_headless_surface_activity`
   - per-camera door-state classifiers → `nest_headless_classifier_positive`
@@ -94,6 +94,23 @@ choosing who to tell — belongs to a separate brain that consumes the events
 2. Install **Nest Headless Snapshot** (the build takes a few minutes) and
    start it. The log should show a line like
    `receiver video codecs: ... video/H264 ...`.
+
+The default installation provides camera capture and persistent live watching.
+Vision and speech are **opt-in** under the add-on's Configuration tab:
+
+- `enable_vision`: local detection, classifiers, zones and face/cat identity.
+- `enable_speech`: microphone processing, wake words, transcription and speaker identity.
+
+Save and restart after changing these switches. Enabled features download their
+dependencies on first start and reuse them offline afterwards. Disabling a
+feature removes its downloaded packages on the next restart, but preserves your
+models, zones, enrolments and recordings. A failed feature download leaves capture
+available; check the log and restart to retry. Models beyond the bundled keyword
+spotter still need to be supplied as described in the docs.
+
+**Upgrading from 1.33.x:** enable the features you already use before restarting.
+Both new switches default to off. Existing feature settings and model files alone
+do not opt you in. Camera snapshots and live watching keep working without them.
 
 The add-on route needs Home Assistant OS or a Supervised install. Container
 and Core installs can run it with [plain Docker](#no-supervisor-plain-docker-works-too),
@@ -153,6 +170,8 @@ token:
    ```
 
 Every add-on option is available as an environment variable.
+For optional features, set `ENABLE_VISION=true` and/or `ENABLE_SPEECH=true` and
+persist `/data` as a Docker volume so feature packages survive container replacement.
 
 ## Mind the quota
 

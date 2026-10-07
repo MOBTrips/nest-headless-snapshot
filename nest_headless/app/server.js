@@ -28,7 +28,7 @@
 
 // Keep in lockstep with config.yaml `version` - consumers (the consumer) read it
 // from GET / to detect that a deploy has landed.
-const ADDON_VERSION = '1.33.3';
+const ADDON_VERSION = '1.34.0';
 
 const http = require('http');
 const fs = require('fs');
@@ -38,9 +38,14 @@ const WebSocket = require('ws');
 const puppeteer = require('puppeteer-core');
 const fns = require('./pagefns');
 const { classify } = require('./classifier');
-const infer = require('./infer');
+const features = require('./features');
+const infer = features.vision.enabled ? require('./infer') : {
+  detect: async () => null, detectCats: async () => null,
+  classifyDoor: async () => null, hasDoorModel: () => false,
+  annotate: async (jpg) => jpg, warmUp: async () => 0,
+};
 const { parseWatchPassages, PassageTracker } = require('./passages');
-const faces = require('./faces');
+const faces = features.vision.enabled ? require('./faces') : { hasModels: () => false };
 const catid = require('./catid');
 const { PendingStore } = require('./pending');
 const diskq = require('./diskq');
@@ -251,7 +256,13 @@ function saveZonesFile(cams) {
   fs.writeFileSync(ZONES_FILE + '.tmp', JSON.stringify(merged, null, 2));
   fs.renameSync(ZONES_FILE + '.tmp', ZONES_FILE);
 }
-loadZonesFile();
+if (features.vision.enabled) {
+  loadZonesFile();
+} else {
+  for (const key of Object.values(ZONE_KINDS)) cfg[key] = {};
+  cfg.watchClassifySeconds = 0;
+}
+if (!features.speech.enabled) cfg.audioCameras = [];
 
 function parseWatches(spec) {
   const out = {};
@@ -499,7 +510,7 @@ async function persistShot(entityId, shot) {
       cropFile = file.replace(/\.jpg$/, '_crop.jpg');
       const cbuf = Buffer.from(shot.cropDataUrl.split(',')[1], 'base64');
       await diskq.writeAtomic(cropFile, cbuf);
-      verdict = classify(entityId, cbuf); // linear model: verdict + framing gate
+      verdict = features.vision.enabled ? classify(entityId, cbuf) : null;
       // The fine-tuned CNN (hot-loaded onnx) outranks the linear verdict when
       // present; the linear model's framing gate still applies on top.
       if (infer.hasDoorModel(entityId)) {
@@ -903,7 +914,7 @@ function debounceTicksFor(meta) {
 // was last told, so a real change is delayed, never lost.
 const ZONE_MIN_DWELL_MS = intEnv('ZONE_MIN_DWELL_S', 60) * 1000;
 let sharpMod = null;
-function getSharp() { if (sharpMod === null) { try { sharpMod = require('sharp'); } catch (e) { sharpMod = false; } } return sharpMod; }
+function getSharp() { if (!features.vision.enabled) return false; if (sharpMod === null) { try { sharpMod = require('sharp'); } catch (e) { sharpMod = false; } } return sharpMod; }
 const FP = 48; // fingerprint side
 // Polygon zones: a 48x48 mask over the bounding rect so the change test only
 // looks inside the drawn shape (cached on the zone object).
@@ -3033,6 +3044,18 @@ const handleRequest = async (req, res) => {
   }
 
   try {
+    const needsVision = ['detect', 'zones', 'training', 'look'].includes(parts[0]) ||
+      (parts[0] === 'identity' && ['face', 'cat', 'who'].includes(parts[1]));
+    const needsSpeech = ['listen', 'speech', 'utterance', 'audiodebug'].includes(parts[0]) ||
+      (parts[0] === 'identity' && parts[1] === 'voice');
+    const missing = needsVision && !features.vision.enabled ? 'vision' :
+      needsSpeech && !features.speech.enabled ? 'speech' :
+      parts[0] === 'identity' && !features.vision.enabled && !features.speech.enabled ? 'vision or speech' : null;
+    if (missing) {
+      res.writeHead(503, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify({ ok: false, reason: 'feature_unavailable', feature: missing,
+        message: `Enable ${missing} in the add-on options and restart; check the log if already enabled.` }));
+    }
     if (url.pathname === '/blank') {
       // watch pages load this instead of about:blank: localhost is a secure
       // context, which AudioWorklet requires (about:blank is opaque-origin)
@@ -3054,7 +3077,7 @@ const handleRequest = async (req, res) => {
       res.end(JSON.stringify({
         addon: 'nest_headless', outDir: cfg.outDir,
         cameras: Object.fromEntries(Object.entries(state).map(([k, v]) => [k, v.lastMeta])),
-        addon: 'nest_headless', version: ADDON_VERSION,
+        addon: 'nest_headless', version: ADDON_VERSION, features,
         cpus: os.cpus().length, nice: os.getPriority(), load: os.loadavg().map((v) => +v.toFixed(2)), loop_lag_ms: loopLagMs,
         audio: audioStats, capturing: Object.keys(speechCap),
         conversations: Object.fromEntries(Object.entries(convo).filter(([, w]) => w.until > Date.now()).map(([k, w]) => [k.replace(/^camera\./, ''), new Date(w.until).toISOString()])),
@@ -3712,6 +3735,7 @@ server.listen(cfg.port, () => {
   // deployment whose cameras never arrive must still end up warm rather than
   // stuck half-initialised.
   const warmVision = (why) => {
+    if (!features.vision.enabled) return;
     infer.warmUp().then((ms) => console.log(`[nest_headless] vision models warm in ${ms} ms (${why})`)).catch((e) => console.warn('[nest_headless] warm-up failed:', e.message));
     if (faces.hasModels(FACE_MODELS_DIR())) faces.getSessions(FACE_MODELS_DIR()).catch(() => {});
   };
@@ -3730,7 +3754,7 @@ server.listen(cfg.port, () => {
     warmVision('boot');
   }
   // read the identity dir (possibly a network share) at boot, not during the first conversation
-  setTimeout(() => loadEnrolledAsync().catch(() => {}), 3000).unref();
+  if (features.vision.enabled || features.speech.enabled) setTimeout(() => loadEnrolledAsync().catch(() => {}), 3000).unref();
   for (const [entityId, interval] of Object.entries(cfg.watches)) {
     runWatch(entityId, interval).catch((e) => console.error(`[nest_headless] watch ${entityId} crashed:`, e.message));
   }

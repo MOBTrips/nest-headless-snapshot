@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.34.0
+
+- Capture and live watching no longer install vision or speech dependencies.
+  New `enable_vision` and `enable_speech` options default to false. Existing users
+  must enable the features they use and restart after upgrading.
+- Enabled packs install into persistent add-on data, use locked dependency
+  versions and are validated before use. Cached restarts work offline; failed
+  optional downloads leave capture available. Disabling a pack removes its
+  downloaded packages on restart without deleting models or user data.
+- Skip unused CUDA/TensorRT downloads and remove ONNX binaries for other
+  platforms. Status reports requested/enabled features and unavailable feature
+  endpoints return a descriptive HTTP 503.
+
 ## 1.33.4
 
 - Fix HAOS image builds failing with `cannot replace to directory .../app/node_modules

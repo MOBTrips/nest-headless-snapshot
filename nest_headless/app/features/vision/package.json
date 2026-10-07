@@ -1,0 +1,9 @@
+{
+  "name": "nest-headless-vision",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "onnxruntime-node": "1.30.0",
+    "sharp": "0.34.5"
+  }
+}

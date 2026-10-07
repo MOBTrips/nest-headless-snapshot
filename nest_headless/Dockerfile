@@ -10,8 +10,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
-COPY app/package.json /app/
-RUN npm install --omit=dev && npm cache clean --force
+COPY app/package.json app/package-lock.json /app/
+RUN npm ci --omit=dev --no-audit --no-fund && npm cache clean --force
 
 COPY app/ /app/
 COPY run.sh /

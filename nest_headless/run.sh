@@ -25,6 +25,8 @@ fi
 
 OPTS="${OPTIONS_FILE:-/data/options.json}"
 if [ -f "$OPTS" ]; then
+  export ENABLE_VISION="$(jq -r '.enable_vision // false' "$OPTS")"
+  export ENABLE_SPEECH="$(jq -r '.enable_speech // false' "$OPTS")"
   export MIN_INTERVAL_SECONDS="$(jq -r '.min_interval_seconds // 10' "$OPTS")"
   export JPEG_QUALITY="$(jq -r '.jpeg_quality // 85' "$OPTS")"
   export CAPTURE_TIMEOUT_SECONDS="$(jq -r '.capture_timeout_seconds // 25' "$OPTS")"
@@ -95,4 +97,12 @@ if [ -f "$OPTS" ]; then
   [ -n "$WAKE_CANON_OPT" ] && export WAKE_CANON="$WAKE_CANON_OPT"
 fi
 
-exec node "$(cd "$(dirname "$0")" && pwd)/app/server.js"
+APP_DIR="$(cd "$(dirname "$0")" && pwd)/app"
+export FEATURE_DATA_DIR="${FEATURE_DATA_DIR:-/data/nest-features}"
+export NODE_PATH="$FEATURE_DATA_DIR/vision/node_modules:$FEATURE_DATA_DIR/speech/node_modules${NODE_PATH:+:$NODE_PATH}"
+# Capture must remain available even after an optional download or disk failure.
+if ! node "$APP_DIR/prepare-features.js"; then
+  echo '[nest_headless] Optional dependency preparation failed; starting capture only'
+  export ENABLE_VISION=false ENABLE_SPEECH=false
+fi
+exec node "$APP_DIR/server.js"

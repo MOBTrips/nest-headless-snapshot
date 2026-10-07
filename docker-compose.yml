@@ -26,6 +26,9 @@ services:
       # Write frames here (mapped below). Omit to keep them container-local
       # and use only the HTTP API.
       OUT_DIR: /out
+      # Optional features download dependencies on first start; off by default.
+      ENABLE_VISION: "false"
+      ENABLE_SPEECH: "false"
       # Optional tuning (defaults shown)
       # MIN_INTERVAL_SECONDS: "10"
       # JPEG_QUALITY: "85"
@@ -35,9 +38,13 @@ services:
       # CROPS: "hallway_cam:0.35:0.0:0.28:0.55"
       # SAMPLES_DIR: /out/samples
     volumes:
+      - nest-feature-data:/data
       # Map to your HA config's www dir so automations can use
       # image_file: /config/www/nest/<camera>.jpg
       - /path/to/homeassistant/config/www/nest:/out
       # Optional: per-camera classifier models (see DOCS.md)
       # - /path/to/homeassistant/config/nest_models:/config/nest_models:ro
     restart: unless-stopped
+
+volumes:
+  nest-feature-data:

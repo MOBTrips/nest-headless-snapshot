@@ -1,0 +1,15 @@
+configuration:
+  enable_vision:
+    name: Enable vision
+    description: >-
+      Install local detection, classifiers, zones and face/cat identity on the
+      next restart. The first start needs internet access and extra disk space.
+      Turn off and restart to remove the downloaded packages; your models and
+      saved data are kept. Camera capture works without this.
+  enable_speech:
+    name: Enable speech
+    description: >-
+      Install microphone processing, wake words, transcription and speaker
+      identity on the next restart. The first start needs internet access and
+      extra disk space. Turn off and restart to remove the downloaded packages;
+      your models and saved data are kept. Camera capture works without this.

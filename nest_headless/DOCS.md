@@ -4,6 +4,41 @@ Gets real still images from WebRTC-only Google Nest cameras by running a
 headless browser on your Home Assistant machine. The repository README has
 the full story.
 
+## Optional features and storage
+
+Version 1.34.0 starts with capture and live watching only. Set `enable_vision: true`
+for detection, classifiers, zones and face/cat identity; set `enable_speech: true`
+for microphone processing, wake words, transcription and speaker identity. Both
+default to false, including on upgrade: existing users must opt in to retain
+these features. Save and restart after changing either option.
+
+Only enabled packs are installed, under `/data/nest-features`. The first start
+needs internet access and temporary space for download/extraction (allow several
+minutes). Later restarts reuse validated packages offline. Disabling a pack
+removes those packages at the next start; re-enabling requires another download.
+Your model files, zones, enrolments and archives are preserved. ONNX packages
+exclude unused GPU libraries and other-platform binaries. Capture continues if
+an optional installation fails; the boot log explains the failure, `GET /` shows
+requested/enabled feature states, and unavailable feature routes return HTTP 503.
+Restart after resolving the cause to retry. Models are still configured separately.
+
+Chromium and its system libraries remain necessary for capture. These switches
+reduce installed dependency storage, not the space used by your image archives.
+Archiving remains opt-in through `samples_dir`; retention uses `archive_days`
+and `evidence_days`.
+
+Measured on an amd64 build: the capture image is about 1.05 GB, with roughly
+86 MB added for vision and 34 MB for speech. These figures exclude user models,
+archives, build caches and temporary installation space; other architectures
+and future base-image updates can differ.
+
+For standalone Docker, persist `/data` and set `ENABLE_VISION=true` and/or
+`ENABLE_SPEECH=true`. For the Mac launcher, set the same variables and point
+`FEATURE_DATA_DIR` at a writable local directory (for example,
+`/Users/you/.config/nest_headless/features`). Use `run.sh` to prepare packs before
+launching the server. Direct `node app/server.js` users must also install the
+selected pack and expose its `node_modules` directory through `NODE_PATH`.
+
 ## Watch mode (persistent streams)
 
 By default every snapshot dials a fresh WebRTC session: one Google API
