@@ -1,3 +1,5 @@
+> **MOBTrips fork:** Authentication, camera allowlists, private default output and installation details are specified in [the fork README](../README.md). Every API example below except `GET /health` must supply the bearer header. `/blank` and `/admin/handover` are loopback-only. Default latest images are `/config/nest_snapshots` in HA Core, not `www/nest`. Optional features and public archives require separate deliberate configuration. The rest of this document preserves the upstream feature reference.
+
 # Nest Headless Snapshot
 
 Gets real still images from WebRTC-only Google Nest cameras by running a

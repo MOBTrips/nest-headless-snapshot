@@ -1,4 +1,10 @@
 configuration:
+  api_token:
+    name: Snapshot API token
+    description: A separate random secret required for all image, status and feature API requests. Keep it private; do not reuse a Home Assistant token.
+  allowed_cameras:
+    name: Allowed camera entities
+    description: Only these camera entities may be captured or watched. An empty list allows none.
   enable_vision:
     name: Enable vision
     description: >-

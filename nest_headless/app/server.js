@@ -28,9 +28,11 @@
 
 // Keep in lockstep with config.yaml `version` - consumers (the consumer) read it
 // from GET / to detect that a deploy has landed.
-const ADDON_VERSION = '1.34.0';
+const ADDON_VERSION = '1.34.0-mob.1';
 
 const http = require('http');
+const { createCameraPolicy, authorizeRequest, requestHandler, eventRequest, redactConfig } = require('./security');
+const cameraPolicy = createCameraPolicy(process.env.ALLOWED_CAMERAS || '[]');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
@@ -77,7 +79,7 @@ const cfg = {
   warmupFrames: intEnv('WARMUP_FRAMES', 3),
   // supervisor mounts HA config at /homeassistant (homeassistant_config map)
   // or /config (legacy map) depending on base/supervisor version
-  outDir: process.env.OUT_DIR || path.join(CONFIG_DIR, 'www/nest'),
+  outDir: process.env.OUT_DIR || path.join(CONFIG_DIR, 'nest_snapshots'),
   chromiumPath: process.env.CHROMIUM_PATH || firstExisting(
     ['/usr/bin/chromium-browser', '/usr/bin/chromium', '/usr/bin/google-chrome',
       '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
@@ -331,12 +333,21 @@ function firstExisting(paths, isFile) {
   return paths[0];
 }
 
+if (!cfg.apiToken) {
+  console.error('FATAL: configure api_token / API_TOKEN before starting');
+  process.exit(1);
+}
+for (const key of ['watches', 'crops', 'watchRois', 'watchPassages', 'watchClassifyZones', 'watchActivityZones']) {
+  for (const entityId of Object.keys(cfg[key])) cameraPolicy(entityId);
+}
+for (const entityId of cfg.audioCameras) cameraPolicy(entityId);
+
 if (!cfg.haToken) {
   console.error('FATAL: no SUPERVISOR_TOKEN / HA_TOKEN available');
   process.exit(1);
 }
 fs.mkdirSync(cfg.outDir, { recursive: true });
-console.log('[nest_headless] config:', JSON.stringify({ ...cfg, haToken: '<set>' }));
+console.log('[nest_headless] config:', JSON.stringify(redactConfig(cfg)));
 
 // ------------------------------------------------------------ Google SDP quirk
 // Google's answer emits "a=candidate: " with an EMPTY foundation (6/6
@@ -347,6 +358,7 @@ const patchCandidate = (c) => (typeof c === 'string' ? c.replace(/^candidate: /,
 
 // ------------------------------------------------------------ HA websocket
 function haOfferSession(entityId, offerSdp, { onAnswer, onCandidate, onError }) {
+  entityId = cameraPolicy(entityId);
   // Returns { close } — closing the socket ends the HA-side session.
   const ws = new WebSocket(cfg.haWsUrl);
   let msgId = 0;
@@ -444,10 +456,10 @@ async function getBrowser() {
 const state = {}; // per-camera: { lastCaptureMs, inflight: Promise|null, lastMeta }
 
 function cameraEntity(name) {
-  return name.startsWith('camera.') ? name : `camera.${name}`;
+  return cameraPolicy(name);
 }
 function cameraFile(name) {
-  return path.join(cfg.outDir, name.replace(/^camera\./, '') + '.jpg');
+  return path.join(cfg.outDir, cameraEntity(name).slice('camera.'.length) + '.jpg');
 }
 
 // Offer/answer/candidates over the HA websocket for one page. Shared by the
@@ -732,12 +744,8 @@ function postHaEvent(type, data) {
   if (role.name !== 'active') { role.suppressed++; return Promise.resolve(0); }
   return new Promise((resolve) => {
     try {
-      const u = new URL(cfg.haWsUrl.replace(/^ws/, 'http'));
-      const prefix = u.hostname === 'supervisor' ? '/core/api/events/' : '/api/events/';
-      const req = http.request({
-        host: u.hostname, port: u.port || 80, path: prefix + type, method: 'POST',
-        headers: { Authorization: 'Bearer ' + cfg.haToken, 'Content-Type': 'application/json' },
-      }, (r) => { r.resume(); resolve(r.statusCode); });
+      const { transport, url, options } = eventRequest(cfg.haWsUrl, type, cfg.haToken);
+      const req = transport.request(url, options, (r) => { r.resume(); resolve(r.statusCode); });
       req.on('error', (e) => { console.warn('[nest_headless] HA event failed:', e.message); resolve(0); });
       req.end(JSON.stringify(data));
     } catch (e) { resolve(0); }
@@ -3027,22 +3035,9 @@ function serveFile(res, entityId, extraHeaders = {}) {
 }
 
 const handleRequest = async (req, res) => {
-  const url = new URL(req.url, 'http://x');
+  const { url, loopback } = authorizeRequest(req, cfg.apiToken);
   const parts = url.pathname.split('/').filter(Boolean);
-  // Sensitive routes - opening a listening window, identity, raw audio -
-  // are loopback-only unless the caller presents the API token (consumer #10).
-  // Snapshots, frames, detection and status stay LAN-open for HA.
   const ip = (req.socket.remoteAddress || '').replace(/^::ffff:/, '');
-  const loopback = ip === '127.0.0.1' || ip === '::1';
-  const sensitive = parts[0] === 'listen' || parts[0] === 'identity' || parts[0] === 'utterance' || parts[0] === 'audiodebug' || parts[0] === 'training' || parts[0] === 'speech' || (parts[0] === 'zones' && req.method !== 'GET');
-  if (sensitive && !loopback) {
-    const auth = req.headers.authorization || '';
-    if (!cfg.apiToken || auth !== `Bearer ${cfg.apiToken}`) {
-      console.warn(`[nest_headless] DENIED ${req.method} ${url.pathname} from ${ip} (${cfg.apiToken ? 'bad or missing token' : 'loopback only'}) at ${new Date().toISOString()}`);
-      res.writeHead(403, { 'Content-Type': 'application/json' }); return res.end(JSON.stringify({ ok: false, reason: 'forbidden' }));
-    }
-  }
-
   try {
     const needsVision = ['detect', 'zones', 'training', 'look'].includes(parts[0]) ||
       (parts[0] === 'identity' && ['face', 'cat', 'who'].includes(parts[1]));
@@ -3123,7 +3118,7 @@ const handleRequest = async (req, res) => {
       return res.end(buf);
     }
     if (parts[0] === 'audiodebug' && parts[1]) {
-      const cam = 'camera.' + parts[1].replace(/\.wav$/, '');
+      const cam = cameraEntity(parts[1].replace(/\.wav$/, ''));
       const st = kwsCtx && kwsCtx.streams && kwsCtx.streams[cam];
       if (!st || !st.ring || !st.ring.length) { res.writeHead(404); return res.end('no audio buffered'); }
       const n = st.ring.reduce((a, b) => a + b.length, 0);
@@ -3631,11 +3626,10 @@ const handleRequest = async (req, res) => {
     res.writeHead(404); res.end('unknown path');
   } catch (e) {
     console.error(`[nest_headless] ${url.pathname} failed:`, e.message);
-    res.writeHead(500, { 'Content-Type': 'text/plain' });
-    res.end('capture failed: ' + e.message);
+    throw e; // The shared wrapper contains parse, authorization and route failures.
   }
 };
-const server = http.createServer(handleRequest);
+const server = http.createServer(requestHandler(handleRequest));
 
 // ---- blue/green handover (1.18.0)
 const HANDOVER_SETTLE_MS = 45000, HANDOVER_MAX_WAIT_MS = 150000;
@@ -3665,7 +3659,7 @@ async function handoverAsNew() {
   // decide whether taking over would actually be an improvement
   const outgoingLiveWatches = async () => {
     try {
-      const st = await new Promise((resolve, reject) => { const u = new URL(cfg.handoverFrom + '/'); http.get({ host: u.hostname, port: u.port || 80, path: '/', timeout: 4000 }, (r) => { let b = ''; r.on('data', (c) => { b += c; }); r.on('end', () => { try { resolve(JSON.parse(b)); } catch (e) { reject(e); } }); }).on('error', reject); });
+      const st = await new Promise((resolve, reject) => { const u = new URL(cfg.handoverFrom + '/'); http.get({ host: u.hostname, port: u.port || 80, path: '/', headers: { Authorization: 'Bearer ' + cfg.apiToken }, timeout: 4000 }, (r) => { let b = ''; r.on('data', (c) => { b += c; }); r.on('end', () => { try { resolve(JSON.parse(b)); } catch (e) { reject(e); } }); }).on('error', reject); });
       return Object.entries(st.watches || {}).filter(([, w]) => w.ready).map(([k]) => k);
     } catch (e) { return null; }   // gone or unreachable
   };
@@ -3710,7 +3704,7 @@ async function handoverAsNew() {
   // a second listener on the target with the same handler: the spare one is
   // not closed first, because close() waits for Chromium's idle keep-alive
   // sockets to /blank (that cost 3 minutes on the first live run)
-  const main = http.createServer(handleRequest);
+  const main = http.createServer(requestHandler(handleRequest));
   await new Promise((resolve, reject) => main.listen(target, () => resolve()).once('error', reject));
   cfg.port = target;
   role.name = 'active'; role.since = Date.now();

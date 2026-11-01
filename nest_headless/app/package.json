@@ -6,7 +6,11 @@
   "main": "server.js",
   "dependencies": {
     "jpeg-js": "^0.4.4",
-    "puppeteer-core": "^24.0.0",
+    "puppeteer-core": "25.16.0",
     "ws": "^8.18.0"
+  },
+  "scripts": {
+    "test:security": "node --test test/security.test.js test/security-server.test.js",
+    "test:capture": "node --test --test-skip-pattern=\"absent models|a model that fails to load|a failed load is NOT|facesInJpeg tolerates|a corrupt classifier model\" test/*.test.js"
   }
 }

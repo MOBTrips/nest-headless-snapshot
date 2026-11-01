@@ -8,6 +8,7 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 (async()=>{
  for(const [vision,speech,failure] of [[false,false],[true,false],[false,true],[true,true],[true,true,true]]) {
   const root=`/tmp/matrix-${vision}-${speech}`;
+ const auth={headers:{Authorization:'Bearer isolated-api-test'}};
   fs.mkdirSync(root,{recursive:true});
   fs.cpSync('/data/nest-features',root+'/features',{recursive:true});
   if (failure) {
@@ -15,9 +16,9 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
    fs.mkdirSync(root+'/bin',{recursive:true});
    fs.writeFileSync(root+'/bin/npm','#!/bin/sh\nexit 1\n',{mode:0o755});
   }
-  fs.mkdirSync(root+'/config/www/nest',{recursive:true});
-  fs.writeFileSync(root+'/config/www/nest/test.jpg',Buffer.from([255,216,255,217]));
-  fs.writeFileSync(root+'/options.json', JSON.stringify({enable_vision:vision,enable_speech:speech}));
+  fs.mkdirSync(root+'/config/nest_snapshots',{recursive:true});
+  fs.writeFileSync(root+'/config/nest_snapshots/test.jpg',Buffer.from([255,216,255,217]));
+  fs.writeFileSync(root+'/options.json', JSON.stringify({enable_vision:vision,enable_speech:speech,api_token:'isolated-api-test',allowed_cameras:['camera.test']}));
   let log='';
   const child=spawn('/bin/sh',['/run.sh'],{env:{...process.env,PATH:failure?root+'/bin:'+process.env.PATH:process.env.PATH,LOG_FILE:root+'/boot.log',HA_CONFIG_DIR:root+'/config',FEATURE_DATA_DIR:root+'/features',OPTIONS_FILE:root+'/options.json',ENABLE_VISION:String(!vision),ENABLE_SPEECH:String(!speech),PORT:'8098',HA_TOKEN:'isolated-test',HA_WS_URL:'ws://127.0.0.1:1'}});
   child.stdout.on('data',b=>log+=b);child.stderr.on('data',b=>log+=b);
@@ -25,7 +26,7 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
    let status;
    for(let n=0;n<150;n++) {
     if(child.exitCode!==null)throw Error('server exited: '+log+(fs.existsSync(root+'/boot.log')?fs.readFileSync(root+'/boot.log','utf8'):''));
-    try {const r=await fetch('http://127.0.0.1:8098/'); if(r.ok){status=await r.json();break;}}catch{}
+    try {const r=await fetch('http://127.0.0.1:8098/',auth); if(r.ok){status=await r.json();break;}}catch{}
     await sleep(100);
    }
    log += fs.existsSync(root+'/boot.log')?fs.readFileSync(root+'/boot.log','utf8'):'';
@@ -33,9 +34,9 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
    assert.equal(status.features.vision.enabled,vision&&!failure,log);
    assert.equal(status.features.speech.enabled,speech&&!failure,log);
    assert.equal((await fetch('http://127.0.0.1:8098/health')).status,200);
-   assert.equal((await fetch('http://127.0.0.1:8098/latest/test.jpg')).status,200);
-   assert.equal((await fetch('http://127.0.0.1:8098/zones')).status,vision&&!failure?200:503);
-   if(!speech||failure)assert.equal((await fetch('http://127.0.0.1:8098/listen/test',{method:'POST'})).status,503);
+   assert.equal((await fetch('http://127.0.0.1:8098/latest/test.jpg',auth)).status,200);
+   assert.equal((await fetch('http://127.0.0.1:8098/zones',auth)).status,vision&&!failure?200:503);
+   if(!speech||failure)assert.equal((await fetch('http://127.0.0.1:8098/listen/test',{...auth,method:'POST'})).status,503);
    assert.equal(fs.existsSync(root+'/features/vision'),vision&&!failure);
    assert.equal(fs.existsSync(root+'/features/speech'),speech&&!failure);
    if (failure) assert(log.includes('capture remains available'),log); else assert(!log.includes('Installing optional'),log);

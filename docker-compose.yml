@@ -16,13 +16,15 @@ services:
       context: ./nest_headless
     container_name: nest-headless-snapshot
     ports:
-      - "8098:8098"
+      - "127.0.0.1:8098:8098"
     environment:
       # Where your Home Assistant lives (use wss:// behind TLS)
       HA_WS_URL: "ws://homeassistant.local:8123/api/websocket"
       # Long-lived access token. Set it in your shell or an .env file,
       # never commit it anywhere
       HA_TOKEN: "${HA_TOKEN}"
+      API_TOKEN: "${API_TOKEN:?Set a separate snapshot API token}"
+      ALLOWED_CAMERAS: '${ALLOWED_CAMERAS:-[]}'
       # Write frames here (mapped below). Omit to keep them container-local
       # and use only the HTTP API.
       OUT_DIR: /out
@@ -41,7 +43,7 @@ services:
       - nest-feature-data:/data
       # Map to your HA config's www dir so automations can use
       # image_file: /config/www/nest/<camera>.jpg
-      - /path/to/homeassistant/config/www/nest:/out
+      - /path/to/homeassistant/config/nest_snapshots:/out
       # Optional: per-camera classifier models (see DOCS.md)
       # - /path/to/homeassistant/config/nest_models:/config/nest_models:ro
     restart: unless-stopped

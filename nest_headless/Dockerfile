@@ -1,4 +1,4 @@
-ARG BUILD_FROM=ghcr.io/home-assistant/amd64-base-debian:bookworm
+ARG BUILD_FROM=node:22.23.4-bookworm-slim
 FROM $BUILD_FROM
 
 # Debian base (swapped from Alpine 2026-08-30): glibc lets native
@@ -6,7 +6,7 @@ FROM $BUILD_FROM
 # classifier) run in-process, multithreaded, instead of WASM in the page.
 # Chromium from Debian repos includes H.264 decode.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      chromium nodejs npm jq fonts-noto-core \
+      chromium jq fonts-noto-core \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

@@ -1,11 +1,11 @@
-name: Nest Headless Snapshot
-version: "1.34.0"
+name: Nest Headless Snapshot (MOBTrips)
+version: "1.34.0-mob.1"
 slug: nest_headless
 description: >-
   Server-side Nest camera stills via headless Chromium — the only WebRTC
   client proven to receive video from these cameras (implements the
   transport-cc congestion feedback Google's sender requires).
-url: "http://homeassistant.local:8098"
+url: "https://github.com/MOBTrips/nest-headless-snapshot"
 arch:
   - amd64
   - aarch64
@@ -13,12 +13,14 @@ init: false
 startup: services
 homeassistant_api: true
 ports:
-  8098/tcp: 8098
+  8098/tcp: null
 ports_description:
   8098/tcp: Snapshot HTTP API (/snapshot/<camera>, /latest/<camera>.jpg)
 map:
   - homeassistant_config:rw
 options:
+  api_token: ""
+  allowed_cameras: []
   enable_vision: false
   enable_speech: false
   min_interval_seconds: 10
@@ -72,6 +74,9 @@ options:
   wake_names: ""
   wake_canon: ""
 schema:
+  api_token: password
+  allowed_cameras:
+    - str
   enable_vision: bool
   enable_speech: bool
   min_interval_seconds: int(1,3600)

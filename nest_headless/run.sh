@@ -25,6 +25,9 @@ fi
 
 OPTS="${OPTIONS_FILE:-/data/options.json}"
 if [ -f "$OPTS" ]; then
+  API_TOKEN_OPT="$(jq -r '.api_token // ""' "$OPTS")"
+  [ -z "$API_TOKEN_OPT" ] || export API_TOKEN="$API_TOKEN_OPT"
+  export ALLOWED_CAMERAS="$(jq -c '.allowed_cameras // []' "$OPTS")"
   export ENABLE_VISION="$(jq -r '.enable_vision // false' "$OPTS")"
   export ENABLE_SPEECH="$(jq -r '.enable_speech // false' "$OPTS")"
   export MIN_INTERVAL_SECONDS="$(jq -r '.min_interval_seconds // 10' "$OPTS")"

@@ -1,3 +1,5 @@
+> This fork requires authenticated capture commands and an explicit camera allowlist. See the root README. Public notification image URLs require a separately secured serving mechanism.
+
 # Wiring patterns
 
 Real automations from the household this add-on was built for. Swap in your
@@ -18,7 +20,7 @@ as current.
   value_template: "{{ (capture.content.meanLuma | default(255)) | float > 3 }}"
 - action: llmvision.image_analyzer
   data:
-    image_file: /config/www/nest/kitchen_camera.jpg
+    image_file: /config/nest_snapshots/kitchen_camera.jpg
     ...
 ```
 
