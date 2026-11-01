@@ -1,4 +1,4 @@
-# 1.34.0-mob.1
+# 1.34.0-mob.2
 
 Security fork: authenticate image/status routes; explicit camera allowlist; guarded URL parsing and async errors; preserve TLS for HA events; redact API tokens; unpublish host port; private snapshot defaults; Node 22/Puppeteer update and regression tests. Legacy executable delegates to the maintained server. Based on upstream 5f21a21.
 

@@ -4,7 +4,7 @@ A security-maintained fork of [rapartlu/nest-headless-snapshot](https://github.c
 
 This app captures real still frames from Nest WebRTC cameras on Home Assistant OS. Home Assistant builds and manages its container; manual Docker administration is unnecessary.
 
-## Changes in 1.34.0-mob.1
+## Changes in 1.34.0-mob.2
 
 - Bearer authentication for **all** image, status, archive and feature APIs, including loopback callers. Only `GET /health` is public. Chromium's `/blank` and handover administration are socket-loopback only.
 - An explicit camera allowlist, validated before camera capture, filesystem access and HA signaling. An empty list allows no cameras.

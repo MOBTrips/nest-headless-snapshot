@@ -1,5 +1,8 @@
-ARG BUILD_FROM=node:22.23.4-bookworm-slim
-FROM $BUILD_FROM
+FROM node:22.23.4-bookworm-slim
+
+ARG BUILD_VERSION
+ARG BUILD_ARCH
+LABEL io.hass.version="${BUILD_VERSION}" io.hass.arch="${BUILD_ARCH}" io.hass.type="app"
 
 # Debian base (swapped from Alpine 2026-08-30): glibc lets native
 # onnxruntime-node load, so the local vision models (cat detector + door

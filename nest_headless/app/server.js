@@ -28,7 +28,7 @@
 
 // Keep in lockstep with config.yaml `version` - consumers (the consumer) read it
 // from GET / to detect that a deploy has landed.
-const ADDON_VERSION = '1.34.0-mob.1';
+const ADDON_VERSION = '1.34.0-mob.2';
 
 const http = require('http');
 const { createCameraPolicy, authorizeRequest, requestHandler, eventRequest, redactConfig } = require('./security');

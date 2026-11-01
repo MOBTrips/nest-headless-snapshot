@@ -1,5 +1,5 @@
 name: Nest Headless Snapshot (MOBTrips)
-version: "1.34.0-mob.1"
+version: "1.34.0-mob.2"
 slug: nest_headless
 description: >-
   Server-side Nest camera stills via headless Chromium — the only WebRTC
